@@ -1,0 +1,182 @@
+{% extends 'admin/change_form.html' %}
+{% load i18n %}
+
+
+{% block admin_change_form_document_ready %}
+{{ block.super }}
+<!-- Customer script -->
+<script type="text/javascript">
+  (function ($) {
+    console.log('test')
+
+    $(function () {
+      var is_running = false;
+      var customer_url = "/api/customer/infos/?";
+      var product_url = "/api/product/infos/?";
+
+      // Inlines
+      var invoiceitem_inline = 'invoiceitem_set';
+
+      // Select inputs
+      var customer_input = $('#id_customer');
+
+      // Depending inputs
+      var company_name_input = $('#id_company_name');
+      var company_vat_input = $('#id_company_vat');
+
+      var contact_first_name_input = $('#id_contact_first_name');
+      var contact_last_name_input = $('#id_contact_last_name');
+      var contact_email_input = $('#id_contact_email');
+      var contact_phone_input = $('#id_contact_phone');
+      var address_street_input = $('#id_address_street');
+      var address_street_number_input = $('#id_address_street_number');
+      var address_bp_input = $('#id_address_bp');
+      var address_zipcode_input = $('#id_address_zipcode');
+      var address_city_input = $('#id_address_city');
+
+      var discount_input = $('#id_discount');
+
+      function update_inputs(json) {
+        company_name_input[0].value = json['company_name'] || null;
+        company_vat_input[0].value = json['company_vat'] || null;
+        contact_first_name_input[0].value = json['contact_first_name'] || null;
+        contact_last_name_input[0].value = json['contact_last_name'] || null;
+        contact_email_input[0].value = json['contact_email'] || null;
+        contact_phone_input[0].value = json['contact_phone'] || null;
+        address_street_input[0].value = json['address_street'] || null;
+        address_street_number_input[0].value = json['address_street_number'] || null;
+        address_bp_input[0].value = json['address_bp'] || null;
+        address_zipcode_input[0].value = json['address_zipcode'] || null;
+        address_city_input[0].value = json['address_city'] || null;
+
+        // Set is_running false here to not run complete_customer ajax
+        is_running = false;
+      }
+
+      function customer_watcher() {
+        function complete_customer_info() {
+          var data = customer_input.find('option:selected').val();
+          if (data && !is_running) {
+            is_running = true;
+            var customer_pk = data;
+            $.ajax({
+              "type": "GET",
+              "url": customer_url + "pk=" + customer_pk,
+              "dataType": "json",
+              "cache": false,
+              "success": function (json) {
+                update_inputs(json, false);
+              }
+            });
+          }
+        }
+        customer_input.bind('change', complete_customer_info);
+      }
+
+      function invoiceitem_inline_watcher() {
+        function calculate_prices() {
+          // Rewrite get_prices method
+          // Get excl_tax
+          var excl_tax = 0;
+          $(`.dynamic-${invoiceitem_inline}`).each(function (index) {
+            excl_tax += $(`#id_${invoiceitem_inline}-${index}-product_price`).val() * $(`#id_${invoiceitem_inline}-${index}-product_quantity`).val();
+          });
+          var excl_tax_discount = excl_tax;
+          // Get discount
+          var discount_percent = parseFloat(discount_input.val() || 0);
+          var discount = (excl_tax * discount_percent) / 100;
+          excl_tax_discount = excl_tax - discount;
+          // Get vat
+          var vat = excl_tax_discount * 0.21;
+          // Get incl_tax
+          var incl_tax = excl_tax_discount + vat;
+          // Remove content table if already exist
+          var pricesTable = $("#pricesTable");
+          if (pricesTable || pricesTable.exists()) { pricesTable.remove(); }
+          // Generate table
+          var content = "<div id='pricesTable'><table style='float:right; width: fit-content; margin: 20px; font-size: 20px !important;'>";
+          content += "<tr><td>Total HTVA</td><td class='text-right'>" + excl_tax.toFixed(2) + "€</td></tr>";
+          if (discount_percent) {
+            content += "<tr><td>Réduction (" + discount_percent.toFixed(2) + " %)</td><td class='text-right'>" + discount.toFixed(2) + "€</td></tr>";
+            content += "<tr><td>Total HTVA (après réduction)</td><td class='text-right'>" + excl_tax_discount.toFixed(2) + "€</td></tr>";
+          }
+          if (vat) {
+            content += "<tr><td>TVA (21%)</td><td class='text-right'>" + vat.toFixed(2) + "€</td></tr>";
+          } else {
+            content += "<tr><td>TVA (0%)</td><td class='text-right'>0.00€</td></tr>";
+          }
+          content += "<tr><td>Total TVAC</td><td class='text-right'>" + incl_tax.toFixed(2) + "€</td></tr>";
+          content += "</table></div>";
+          $('#invoiceitem_set-group .module').append(content);
+        }
+
+        discount_input.bind('change', calculate_prices);
+
+        $(`.dynamic-${invoiceitem_inline}`).each(function (index) {
+          var product_input = $(`#id_${invoiceitem_inline}-${index}-product`);
+          var description_input = $(`#id_${invoiceitem_inline}-${index}-product_description`);
+          // var vat_input = $(`#id_${invoiceitem_inline}-${index}-product_vat`);
+          var quantity_input = $(`#id_${invoiceitem_inline}-${index}-product_quantity`);
+          var price_input = $(`#id_${invoiceitem_inline}-${index}-product_price`);
+          product_input.bind('change', function () {
+            var data = product_input.find('option:selected').val();
+            $.ajax({
+              'type': 'GET',
+              'url': product_url + "pk=" + data,
+              'dataType': 'json',
+              'cache': false,
+              'success': function (json) {
+                description_input[0].value = json['product_description'] || null;
+                // vat_input[0].value = json['product_vat'] || null;
+                price_input[0].value = json['product_price'] || null;
+                calculate_prices();
+              }
+            });
+          });
+          quantity_input.bind('change', calculate_prices);
+          price_input.bind('change', calculate_prices);
+        });
+
+        // Calculate initial prices
+        calculate_prices();
+      }
+
+      $(document).ready(function () {
+        customer_watcher();
+        // as long as invoiceitem_inline_watcher does not include return false;
+        // it shouldn't interfere with the existing functionality of that button.
+        invoiceitem_inline_watcher();
+        $('.add-row a').click(invoiceitem_inline_watcher);
+      });
+    });
+  })(django.jQuery);
+</script>
+
+<script type="text/javascript">
+  (function ($) {
+    var ref_number_input = $('#id_invoice_number');
+    var ref_number_warning = $('#id_ref_number_warning');
+
+    {% if adminform.form.ref_number_warning.value %}
+    // Hide parent block (only if ref_number_warning is at True -- initail value --)
+    ref_number_warning.parent().parent().addClass("hidden");
+    {% endif %}
+
+    function ref_number_watcher() {
+      function display_ref_number_warning() {
+        // Display field
+        ref_number_warning.parent().parent().removeClass("hidden");
+        // Reset value
+        ref_number_warning.prop("checked", false);
+      }
+      ref_number_input.bind('change', display_ref_number_warning);
+    }
+
+    $(function () {
+      $(document).ready(function () {
+        ref_number_watcher();
+      });
+    });
+  })(django.jQuery);
+</script>
+{% endblock %}
