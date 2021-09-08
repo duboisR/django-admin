@@ -58,6 +58,10 @@ def generate_invoice_number(country_prefix=1):
 
 
 class Invoice(models.Model):
+    STATUS_CHOICES = (
+        ('waiting', _("En cours")),
+        ('done', _("Payée"))
+    )
     TERMS_CHOICES = (
         ('15', _("15 jours")),
         ('15_end', _("15 jours fin de mois")),
@@ -72,6 +76,7 @@ class Invoice(models.Model):
 
     # Invoice informations
     invoice_number = models.CharField(max_length=255, unique=True, default=generate_invoice_number)
+    invoice_status = models.CharField(verbose_name=_("Statut"), max_length=25, choices=STATUS_CHOICES, default='waiting')
     invoice_date = models.DateField(default=timezone.now)
     terms_payment = models.CharField(max_length=25, choices=TERMS_CHOICES, default='15')
     discount = models.DecimalField(decimal_places=2, max_digits=5, default=0,

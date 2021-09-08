@@ -21,12 +21,10 @@ class Customer(models.Model):
     contact_email = models.EmailField(verbose_name=_("Adresse e-mail"), blank=True, null=True)
     contact_phone = models.CharField(verbose_name=_("Téléphone"), validators=[djangoadmin.validators.PhoneValidator], max_length=255)
 
-    # STEP 2
     class Meta:
         verbose_name = _("Client")
         verbose_name_plural = _("Clients")
 
-    # STEP 3
     def __str__(self):
         if self.company_vat:
             return "Société: %s (TVA: %s)" % (self.company_name, self.company_vat)
@@ -45,16 +43,13 @@ class CustomerAddress(models.Model):
     address_zipcode = models.CharField(verbose_name=_("Code postal"), max_length=5)
     address_city = models.CharField(verbose_name=_("Ville"), max_length=255)
 
-    # STEP 2
     class Meta:
         verbose_name = _("Adresse")
         verbose_name_plural = _("Addresses")
 
-    # STEP 3
     def __str__(self):
         return self.get_address()
 
-    # STEP 4
     def get_address(self):
         address = self.address_street
         if self.address_street_number:
@@ -78,7 +73,7 @@ class Product(models.Model):
         verbose_name = _("Produit")
         verbose_name_plural = _("Produits")
 
-    # STEP 3
+    # STEP 4
     def __str__(self):
         if (len(self.description) > 25):
             return "%s..." % self.description[:25]
@@ -100,6 +95,10 @@ def generate_invoice_number(country_prefix=1):
 
 
 class Invoice(models.Model):
+    STATUS_CHOICES = (
+        ('waiting', _("En cours")),
+        ('done', _("Payée"))
+    )
     TERMS_CHOICES = (
         ('15', _("15 jours")),
         ('15_end', _("15 jours fin de mois")),
@@ -115,6 +114,7 @@ class Invoice(models.Model):
     # Invoice informations
     invoice_number = models.CharField(verbose_name=_("Numéro"), max_length=255, unique=True, default=generate_invoice_number)
     invoice_date = models.DateField(verbose_name=_("Date de facturation"), default=timezone.now)
+    invoice_status = models.CharField(verbose_name=_("Statut"), max_length=25, choices=STATUS_CHOICES, default='waiting')
     terms_payment = models.CharField(verbose_name=_("Conditions de payement"), max_length=25, choices=TERMS_CHOICES, default='15')
     discount = models.DecimalField(verbose_name=_("Réduction (en %)"), decimal_places=2, max_digits=5, default=0,
         validators=[MinValueValidator(Decimal('0.00')), MaxValueValidator(Decimal('100'))])
@@ -140,23 +140,19 @@ class Invoice(models.Model):
     address_zipcode = models.CharField(verbose_name=_("Code postal"), max_length=5)
     address_city = models.CharField(verbose_name=_("Ville"), max_length=255)
 
-    # STEP 2
     class Meta:
         verbose_name = _("Facture")
         verbose_name_plural = _("Factures")
 
-    # STEP 3
     def __str__(self):
         return self.invoice_number
 
-    # STEP 4
     def get_customer(self):
         if self.company_vat:
             return "Société: %s (TVA: %s)" % (self.company_name, self.company_vat)
         return "Particulier: %s" % self.contact_last_name
     get_customer.short_description = _("Client")
 
-    # STEP 4
     def get_address(self):
         address = self.address_street
         if self.address_street_number:
@@ -167,7 +163,6 @@ class Invoice(models.Model):
         return address
     get_address.short_description = _("Adresse")
 
-    # STEP 4
     def get_deadline_date(self):
         deadline_date = self.invoice_date
         if self.terms_payment:
@@ -184,7 +179,6 @@ class Invoice(models.Model):
         return deadline_date
     get_deadline_date.short_description = _("Date butoire")
 
-    # STEP 4
     def get_prices(self):
         excl_tax_vat = {}  # calculate excl_tax foreach vat
         for invoiceitem_instance in self.invoiceitem_set.all():
@@ -215,7 +209,6 @@ class Invoice(models.Model):
             'incl_tax': excl_tax_discount + round(sum(vat_val.values()), 2),
         }
 
-    # STEP 4
     def get_total(self):
         return self.get_prices().get('excl_tax_discount')
     get_total.short_description = _("Montant (HTVA)")
@@ -233,11 +226,9 @@ class InvoiceItem(models.Model):
     product_vat = models.PositiveIntegerField(verbose_name=_("TVA (%)"), default=21)
     product_price = models.DecimalField(verbose_name=_("Prix (HTVA)"), max_digits=15, decimal_places=2, default=Decimal("0.00"))
 
-    # STEP 2
     class Meta:
         verbose_name = _("Facture (Produit)")
         verbose_name_plural = _("Facture (Produits)")
 
-    # STEP 3
     def __str__(self):
         return "%s - %s" % (self.invoice, self.product_description)
