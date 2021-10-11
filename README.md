@@ -177,8 +177,3 @@ STEP 17: Faire un lien entre le modèle 'Customer' et 'Invoice'
 Pour la page d'accueil:
 -----------------------
 STEP 18: Renomer l'App dans la page d'accueil de Django Admin
-
-
-Conclusion:
------------
-- Faire une comparatif Pommee / Beplanet
